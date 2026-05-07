@@ -1,0 +1,6 @@
+@ServiceFlow.API_HostAddress = http://localhost:5143
+
+GET {{ServiceFlow.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
