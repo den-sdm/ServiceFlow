@@ -27,12 +27,13 @@ A comprehensive monitoring solution for tracking file processing services across
 ---
 
 ## 🎯 Overview
+(#overview)
 
 ServiceFlow Monitor is a distributed monitoring system designed to track Windows service performance across a large server estate. It monitors file processing pipelines, detects when services fall behind, and provides centralized alerting and management capabilities.
 
 **Project Phase:** Phase 1 (Core Functionality)  
 **Demo Date:** May 10, 2026  
-**Coordinator:** Mihai.Abrudan@flex.com
+**Coordinator:** Cristian Herghelegiu
 
 ### Key Capabilities:
 - **Real-time Monitoring:** Track file processing services across multiple servers
