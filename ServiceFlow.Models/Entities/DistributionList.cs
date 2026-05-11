@@ -1,6 +1,6 @@
 using System;
-namespace ServiceFlow.Models.Entities;
 
+namespace ServiceFlow.Models.Entities;
 
 public class DistributionList
 {
@@ -10,5 +10,6 @@ public class DistributionList
     public bool IsActive { get; set; } = true;
     public DateTime CreatedDate { get; set; }
 
+    // Navigation property
     public Service Service { get; set; } = null!;
 }

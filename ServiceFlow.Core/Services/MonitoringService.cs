@@ -4,6 +4,7 @@ using ServiceFlow.Data.Repositories;
 using ServiceFlow.Models.DTOs;
 using ServiceFlow.Models.Entities;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace ServiceFlow.Core.Services;
@@ -28,25 +29,33 @@ public class MonitoringService : IMonitoringService
     {
         var services = await _serviceRepository.GetAllServicesAsync();
 
-        var statusSummaries = services.SelectMany(s => s.Verifications
-            .Where(v => v.ServiceStatus != null)
-            .Select(v => new ServiceStatusSummaryDto
+        var statusSummaries = new List<ServiceStatusSummaryDto>();
+
+        foreach (var service in services)
+        {
+            foreach (var verification in service.Verifications)
             {
-                ServiceID = s.ServiceID,
-                ServiceName = s.ServiceName,
-                FriendlyName = s.FriendlyName,
-                Hostname = s.Server.Hostname,
-                CriticalityLevel = s.CriticalityLevel,
-                IsDown = v.ServiceStatus!.IsDown,
-                CurrentValue = v.ServiceStatus.CurrentValue,
-                ThresholdValue = v.ThresholdValue,
-                LastCheckTime = v.ServiceStatus.LastCheckTime,
-                DownSince = v.ServiceStatus.DownSince,
-                TimeSinceDown = v.ServiceStatus.DownSince.HasValue
-                    ? GetTimeSinceDown(v.ServiceStatus.DownSince.Value)
-                    : null,
-                ErrorMessage = v.ServiceStatus.ErrorMessage
-            })).ToList();
+                var status = verification.ServiceStatus;
+
+                statusSummaries.Add(new ServiceStatusSummaryDto
+                {
+                    ServiceID = service.ServiceID,
+                    ServiceName = service.ServiceName,
+                    FriendlyName = service.FriendlyName,
+                    Hostname = service.Server.Hostname,
+                    CriticalityLevel = service.CriticalityLevel,
+                    IsDown = status?.IsDown ?? false,  // Default to false if no status
+                    CurrentValue = status?.CurrentValue ?? 0,  // Default to 0
+                    ThresholdValue = verification.ThresholdValue,
+                    LastCheckTime = status?.LastCheckTime ?? DateTime.UtcNow,  // Default to now
+                    DownSince = status?.DownSince,
+                    TimeSinceDown = status?.DownSince.HasValue == true
+                        ? GetTimeSinceDown(status.DownSince.Value)
+                        : null,
+                    ErrorMessage = status?.ErrorMessage
+                });
+            }
+        }
 
         var downServices = statusSummaries.Where(s => s.IsDown).OrderBy(s => s.CriticalityLevel).ToList();
 

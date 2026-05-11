@@ -13,8 +13,8 @@ BEGIN
         ServerID INT IDENTITY(1,1) PRIMARY KEY,
         Hostname NVARCHAR(255) NOT NULL UNIQUE,
         IPAddress NVARCHAR(50),
-        OperatingSystem NVARCHAR(100),
         IsActive BIT NOT NULL DEFAULT 1,
+        LastHeartbeat DATETIME2 NULL,
         CreatedDate DATETIME NOT NULL DEFAULT GETUTCDATE(),
         ModifiedDate DATETIME NOT NULL DEFAULT GETUTCDATE()
     );
@@ -148,7 +148,7 @@ GO
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DistributionLists' AND schema_id = SCHEMA_ID('ServiceFlow'))
 BEGIN
     CREATE TABLE ServiceFlow.DistributionLists (
-        DistributionListID INT IDENTITY(1,1) PRIMARY KEY,
+        ListID INT IDENTITY(1,1) PRIMARY KEY,
         ServiceID INT NOT NULL,
         EmailAddress NVARCHAR(255) NOT NULL,
         IsActive BIT NOT NULL DEFAULT 1,
