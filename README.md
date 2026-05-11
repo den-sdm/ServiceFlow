@@ -1,205 +1,68 @@
 # ServiceFlow Monitor
 
-**Distributed Windows Service Monitoring System with Centralized Dashboard**
+Monitor your Windows file processing services from one place.
 
-A comprehensive monitoring solution for tracking file processing services across multiple servers with real-time status updates, threshold-based alerting, and centralized management dashboard.
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [API Documentation](#api-documentation)
-- [Database Schema](#database-schema)
-- [Technologies](#technologies)
-- [Phase 1 Deliverables](#phase-1-deliverables)
-- [Known Issues](#known-issues)
-- [Roadmap](#roadmap)
-- [Team](#team)
+This system tracks services across multiple servers, sends alerts when file counts get too high, and gives you a web dashboard to see what's happening.
 
 ---
 
-## 🎯 Overview
+## What you need before starting
 
+Install these first:
 
-ServiceFlow Monitor is a distributed monitoring system designed to track Windows service performance across a large server estate. It monitors file processing pipelines, detects when services fall behind, and provides centralized alerting and management capabilities.
+- SQL Server 2016 or newer
+- .NET 8 SDK - https://dotnet.microsoft.com/download/dotnet/8.0
+- Node.js 18 or newer - https://nodejs.org/
 
-**Project Phase:** Phase 1 (Core Functionality)  
-**Demo Date:** May 10, 2026  
-**Coordinator:** Cristian Herghelegiu
-
-### Key Capabilities:
-- **Real-time Monitoring:** Track file processing services across multiple servers
-- **Threshold Alerts:** Automatic detection when unprocessed files exceed configured limits
-- **Centralized Dashboard:** Web-based UI with service status cards and detailed views
-- **Configurable Services:** Web interface for adding and managing monitored services
-- **Historical Tracking:** Down/recovery event history with timestamps
+You'll also want SQL Server Management Studio (SSMS) to run the database scripts.
 
 ---
 
-## ✨ Features
+## Getting it running
 
-### Current (Phase 1):
-
-#### 🖥️ **Web Dashboard**
-- Service status cards with color-coded indicators (Green = OK, Red = DOWN)
-- Real-time file count vs threshold display
-- Search and filter by service name, status, or server
-- Service details modal with verification history
-- Auto-refresh every 30 seconds
-
-#### ⚙️ **Service Management**
-- Settings page for creating new monitoring services
-- Configure thresholds, polling intervals, and alert settings
-- Distribution list management for email alerts
-- Service criticality levels (1=Critical to 4=Low)
-
-#### 📊 **Monitoring**
-- File processing verification (count files in folder)
-- Threshold-based status determination
-- Last check timestamp tracking
-- Error message capture and display
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Web Browser                          │
-│                   http://localhost:5173                     │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         │ HTTP/JSON
-                         │
-┌────────────────────────▼────────────────────────────────────┐
-│                   React Dashboard                           │
-│            (Service Cards, Settings, History)               │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         │ REST API
-                         │
-┌────────────────────────▼────────────────────────────────────┐
-│                  .NET 8 Web API                             │
-│         (Controllers, Services, Repositories)               │
-│                http://localhost:5143                        │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         │ ADO.NET / EF Core
-                         │
-┌────────────────────────▼────────────────────────────────────┐
-│              SQL Server Database                            │
-│            ServiceFlowMonitor (10 tables)                   │
-└─────────────────────────────────────────────────────────────┘
-                         ▲
-                         │ Status Reports (Phase 2)
-                         │
-┌────────────────────────┴────────────────────────────────────┐
-│              Windows Service Agents                         │
-│         (File monitoring, heartbeat - Phase 2)              │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📦 Prerequisites
-
-### Required:
-- **SQL Server** 2016 or later
-- **.NET 8 SDK** ([Download](https://dotnet.microsoft.com/download/dotnet/8.0))
-- **Node.js** 18.x or later ([Download](https://nodejs.org/))
-- **Git** ([Download](https://git-scm.com/))
-
-### Recommended:
-- **SQL Server Management Studio (SSMS)**
-- **Visual Studio 2022** or **VS Code**
-- **Windows 10/11** or **Windows Server 2016+**
-
----
-
-## 🚀 Installation
-
-### 1. Clone Repository
+### 1. Clone the repo
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/ServiceFlow-Monitor.git
-cd ServiceFlow-Monitor
+git clone https://github.com/den-sdm/ServiceFlow.git
+cd ServiceFlow
 ```
 
-### 2. Database Setup
+Check that your tools are installed:
 
-Open **SQL Server Management Studio (SSMS)** and execute scripts in order:
+```powershell
+dotnet --version  # needs to be 8.0.x
+node --version    # needs to be v18.x.x or higher
+```
+
+### 2. Set up the database
+
+Open SSMS and create the database:
 
 ```sql
--- Connect to SQL Server, then run:
-:r Database\01_CreateDatabase.sql
-:r Database\02_CreateTables.sql
-:r Database\03_CreateStoredProcedures.sql
-:r Database\04_InsertTestData.sql
+CREATE DATABASE ServiceFlowMonitor;
+GO
 ```
 
-**Or manually execute each file:**
-1. File → Open → `Database/01_CreateDatabase.sql` → Execute (F5)
-2. File → Open → `Database/02_CreateTables.sql` → Execute (F5)
-3. File → Open → `Database/03_CreateStoredProcedures.sql` → Execute (F5)
-4. File → Open → `Database/04_InsertTestData.sql` → Execute (F5)
+Now run the table creation script. In SSMS, open all sql files and hit F5.
 
-**Verify:**
+**Important step:** Verify the schema is correct. Some columns are easy to miss and will cause errors later.
+
 ```sql
 USE ServiceFlowMonitor;
-SELECT * FROM ServiceFlow.Services;
--- Should return 1 test service: "Invoice File Processor"
+
+-- Check these two columns exist
+SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'Servers' AND COLUMN_NAME = 'LastHeartbeat';
+
+SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS  
+WHERE TABLE_NAME = 'DistributionLists' AND COLUMN_NAME = 'ListID';
 ```
 
-### 3. Backend API Setup
+Both queries should return 1 row. If either returns nothing, check the troubleshooting section below.
 
-```powershell
-cd ServiceFlow.API
+### 3. Configure the connection string
 
-# Restore dependencies
-dotnet restore
-
-# Build
-dotnet build
-
-# Run
-dotnet run
-```
-
-**API will start on:** `http://localhost:5143`
-
-**Verify:** Open `http://localhost:5143/swagger` in browser
-
-### 4. Frontend Dashboard Setup
-
-```powershell
-cd serviceflow-web
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-**Dashboard will start on:** `http://localhost:5173`
-
-**Verify:** Open `http://localhost:5173` in browser
-
----
-
-## ⚙️ Configuration
-
-### API Configuration
-
-**File:** `ServiceFlow.API/appsettings.json`
+Edit `ServiceFlow.API/appsettings.json` and update the Server name if needed:
 
 ```json
 {
@@ -209,169 +72,273 @@ npm run dev
 }
 ```
 
-**Update if using:**
-- Different SQL Server instance
-- SQL authentication
-- Remote database server
+Change `localhost` to your SQL Server instance name if you're not using the default.
 
-### React Configuration
+### 4. Start the API
 
-**File:** `serviceflow-web/src/App.jsx` (Line 4)
+Open a terminal:
 
-```javascript
-const API_URL = 'http://localhost:5143/api/services';
+```powershell
+cd ServiceFlow.API
+dotnet restore
+dotnet build
+dotnet run
 ```
 
+You should see:
+
+```
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5143
+```
+
+Leave this terminal open.
+
+### 5. Start the dashboard
+
+Open a second terminal:
+
+```powershell
+cd serviceflow-dashboard
+npm install
+npm run dev
+```
+
+You should see:
+
+```
+VITE v5.x.x  ready in 500 ms
+➜  Local:   http://localhost:5173/
+```
+
+Leave this terminal open too.
+
+### 6. Open it in your browser
+
+Go to http://localhost:5173
+
+You should see the dashboard. If you ran the test data script, there's already a service card showing. If not, you'll need to add one.
+
 ---
 
-## 📖 Usage
+## Adding a service to monitor
 
-### Quick Start
+Click Settings in the sidebar and fill out the form:
 
-1. **Start API:** `cd ServiceFlow.API && dotnet run`
-2. **Start Dashboard:** `cd serviceflow-web && npm run dev`
-3. **Open:** `http://localhost:5173`
+- Service Name: `TestProcessor` (or whatever you want to call it)
+- Server Hostname: Your computer name (check with `hostname` in cmd)
+- Friendly Name: `Test File Processing Service`
+- Criticality Level: Medium
+- UNC Path: `C:\TestFolder` (create this folder first)
+- File Pattern: `*.txt`
+- File Count Threshold: 5 (alerts when you have more than 5 files)
+- Polling Interval: 60 seconds
+- Alert Repeat: 30 minutes
+- Email: your.email@example.com
 
-### Add New Service
+Click Save. The service should appear on the Dashboard page.
 
-1. Click **"Settings"** in sidebar
-2. Fill in service details
-3. Click **"Save to Database"**
-4. Service appears in Dashboard
+Status colors:
+- Green = file count is below threshold
+- Red = file count exceeded threshold
+- Gray = not checked yet
 
 ---
 
-## 📁 Project Structure
+## When things go wrong
+
+### API won't start: "Invalid column name 'LastHeartbeat'"
+
+The Servers table is missing a column. Fix it:
+
+```sql
+USE ServiceFlowMonitor;
+ALTER TABLE [ServiceFlow].[Servers]
+ADD [LastHeartbeat] DATETIME2 NULL;
+```
+
+### API won't start: "Invalid column name 'ListID'"
+
+The DistributionLists table has the wrong column name. Fix it:
+
+```sql
+USE ServiceFlowMonitor;
+EXEC sp_rename 
+    '[ServiceFlow].[DistributionLists].[DistributionListID]', 
+    'ListID', 
+    'COLUMN';
+```
+
+### Can't save services: "CHECK constraint 'CK_ServiceVerifications_JSON'"
+
+The database is checking if configuration is valid JSON. Drop the constraint:
+
+```sql
+USE ServiceFlowMonitor;
+ALTER TABLE [ServiceFlow].[ServiceVerifications]
+DROP CONSTRAINT CK_ServiceVerifications_JSON;
+```
+
+We can add it back later with proper validation.
+
+### Dashboard shows one service but database has more
+
+Old code filtered out services that don't have status records yet. Get the latest code:
+
+```powershell
+git pull origin main
+cd ServiceFlow.API
+dotnet clean
+dotnet build
+dotnet run
+```
+
+Restart the dashboard too.
+
+### Dashboard says "Could not fetch data from API"
+
+Check these:
+1. Is the API running? Visit http://localhost:5143/swagger
+2. Did SQL Server start?
+3. Is the connection string correct in appsettings.json?
+4. Try clearing your browser cache (Ctrl+Shift+Del) and refreshing
+
+### Port 5143 is already in use
+
+Find what's using it and kill it:
+
+```powershell
+netstat -ano | findstr :5143
+taskkill /PID <number from above> /F
+```
+
+Then start the API again.
+
+---
+
+## How the code is organized
 
 ```
 ServiceFlow/
-├── Database/                      # SQL Scripts
+├── Database/
 │   ├── 01_CreateDatabase.sql
-│   ├── 02_CreateTables.sql
+│   ├── 02_CreateTables.sql          ← Run this first
 │   ├── 03_CreateStoredProcedures.sql
 │   └── 04_InsertTestData.sql
-├── ServiceFlow.API/               # .NET 8 Web API
+│
+├── ServiceFlow.API/                 ← .NET 8 backend
 │   ├── Controllers/
-│   ├── Properties/
-│   ├── appsettings.json
+│   ├── appsettings.json            ← Update connection string here
 │   └── Program.cs
-├── ServiceFlow.Core/              # Business Logic
+│
+├── ServiceFlow.Core/                ← Business logic
 │   └── Services/
-├── ServiceFlow.Data/              # Data Access
+│       └── MonitoringService.cs
+│
+├── ServiceFlow.Data/                ← Database access
 │   ├── ServiceFlowDbContext.cs
 │   └── Repositories/
-├── ServiceFlow.Models/            # Data Models
+│
+├── ServiceFlow.Models/              ← Data structures
 │   ├── Entities/
+│   │   ├── Service.cs
+│   │   ├── Server.cs
+│   │   ├── ServiceVerification.cs
+│   │   └── DistributionList.cs     ← This file must exist
 │   └── DTOs/
-├── serviceflow-web/               # React Frontend
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── App.css
-│   │   └── main.jsx
-│   └── package.json
-├── .gitignore
-└── README.md
+│
+└── serviceflow-dashboard/           ← React frontend
+    ├── src/
+    │   ├── App.jsx
+    │   └── main.jsx
+    └── package.json
 ```
 
 ---
 
-## 🔌 API Documentation
+## Making changes
 
-### Base URL: `http://localhost:5143/api`
+If you want to add features or fix bugs:
 
-### Key Endpoints:
+```powershell
+# Create a branch
+git checkout -b feature/your-change
 
-#### Get All Services
-```http
-GET /services
+# Make your changes, then test
+cd ServiceFlow.API
+dotnet build
+dotnet run
+
+# Test the frontend
+cd ../serviceflow-dashboard
+npm run dev
+
+# Commit when it works
+git add .
+git commit -m "What you changed"
+git push origin feature/your-change
 ```
 
-#### Get Service Details
-```http
-GET /services/{id}
+Before committing, make sure:
+- API builds without errors
+- Dashboard loads at http://localhost:5173
+- You can create a service and it shows up on the dashboard
+
+---
+
+## What's not done yet
+
+Phase 1 (the current demo) has the core features working. These are planned for later:
+
+- Windows Service agent that actually checks files (right now status is manual)
+- Email notifications when thresholds are exceeded
+- Okta login
+- Monitoring Event Viewer logs
+- Monitoring SQL table rows
+- Monitoring text log files
+- Restarting services from the dashboard
+
+---
+
+## Quick reference for demo day (May 10)
+
+```powershell
+# Start SQL Server if it's not running
+
+# Pull latest code
+git pull origin main
+
+# Terminal 1
+cd ServiceFlow.API
+dotnet run
+
+# Terminal 2  
+cd serviceflow-dashboard
+npm run dev
+
+# Open browser to http://localhost:5173
 ```
 
-#### Create Service
-```http
-POST /services
-```
-
-#### Agent Check
-```http
-POST /agent/check
-```
-
-**Full API documentation:** `http://localhost:5143/swagger`
+Test that you can create a service before the actual demo.
 
 ---
 
-## 🗄️ Database Schema
+## Who built this
 
-### Key Tables:
-- **Servers** - Monitored servers
-- **Services** - Service configurations
-- **ServiceVerifications** - Verification settings
-- **ServiceStatus** - Current status
-- **ServiceHistory** - Event history
+- Dragoș Bondar: Database and API
+- Denisa Sas: Agent and system integration
+- Dragoș Moldovan: React dashboard
 
-**Total:** 10 tables, 4 stored procedures
+Project coordinator: Cristian Herghelegiu  
 
 ---
 
-## 🛠️ Technologies
+## Questions?
 
-- **.NET 8** - Web API
-- **React 18** - Frontend
-- **SQL Server** - Database
-- **Entity Framework Core** - ORM
-- **Vite** - Build tool
+Check the troubleshooting section first. If you're still stuck, email Mihai.Abrudan@flex.com or open an issue on GitHub.
 
 ---
 
-## 🎯 Phase 1 Deliverables
-
-### ✅ Completed:
-- [x] Database schema (10 tables)
-- [x] .NET 8 Web API
-- [x] React dashboard
-- [x] Service management
-- [x] File processing monitoring scenario
-
-### Demo Ready:
-- Dashboard shows service status ✅
-- Can create new services ✅
-- Status updates in real-time ✅
-- Color-coded alerts ✅
-
----
-
-## ⚠️ Known Issues
-
-- MailKit/MimeKit security warnings (Phase 2 feature)
-- Agent not yet implemented (Phase 2)
-- Okta authentication pending
-
----
-
-## 🗺️ Roadmap
-
-### Phase 2:
-- [ ] Windows Service agent
-- [ ] Email notifications
-- [ ] Okta authentication
-- [ ] Additional verification types
-
----
-
-## 👥 Team
-
-- **Developer 1 (Dragoș Bondar):** Database, API
-- **Developer 2 (Denisa Sas):** Agent, Integration
-- **Developer 3 (Dragoș Moldovan):** React dashboard
-
-**Coordinator:** Cristian Herghelegiu
-
----
-
-**Last Updated:** May 7, 2026  
-**Version:** 1.0.0-phase1
+Last updated: May 11, 2026  
+Version: 1.0.0 (Phase 1)  
+Repository: https://github.com/den-sdm/ServiceFlow
